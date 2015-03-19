@@ -11,13 +11,13 @@ namespace CefSharp
 {
     namespace Internals
     {
-        JavascriptCallbackDto^ JavascriptCallbackRegistry::CreateWrapper(CefRefPtr<CefV8Context> context, CefRefPtr<CefV8Value> value)
+        JavascriptCallback^ JavascriptCallbackRegistry::Register(CefRefPtr<CefV8Context> context, CefRefPtr<CefV8Value> value)
         {
             Int64 newId = Interlocked::Increment(_lastId);
             JavascriptCallbackWrapper^ wrapper = gcnew JavascriptCallbackWrapper(value, context);
-            _callbacks->Add(newId, wrapper);
+            _callbacks->TryAdd(newId, wrapper);
 
-            JavascriptCallbackDto^ result = gcnew JavascriptCallbackDto();
+            auto result = gcnew JavascriptCallback();
             result->Id = newId;
             result->BrowserId = _browserId;
             return result;
@@ -25,20 +25,21 @@ namespace CefSharp
 
         JavascriptResponse^ JavascriptCallbackRegistry::Execute(Int64 id, array<Object^>^ params)
         {
-            JavascriptResponse^ result = nullptr;
-            if (_callbacks->ContainsKey(id))
+            JavascriptCallbackWrapper^ callback;
+
+            if (_callbacks->TryGetValue(id, callback))
             {
-                result = _callbacks[id]->Execute(params);
+                return callback->Execute(params);
             }
-            return result;
+
+            return nullptr;
         }
 
-        void JavascriptCallbackRegistry::RemoveWrapper(Int64 id)
+        void JavascriptCallbackRegistry::Deregister(Int64 id)
         {
-            if (_callbacks->ContainsKey(id))
+            JavascriptCallbackWrapper^ callback;
+            if(_callbacks->TryRemove(id, callback))
             {
-                JavascriptCallbackWrapper^ callback = _callbacks[id];
-                _callbacks->Remove(id);
                 delete callback;
             }
         }
